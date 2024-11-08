@@ -103,7 +103,7 @@ class Lexer:
 
 
 # Example usage
-input_text = "int x = 10; int y = 10; String hello = 'hello' while (x > 5) { x = x - 1; }"
+input_text = "int x = 10; int y = 10; String var = 'hello' while (x > 5) { x = x - 1; }"
 lexer = Lexer(input_text)
 tokens = lexer.tokenize()
 
