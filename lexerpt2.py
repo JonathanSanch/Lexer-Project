@@ -74,8 +74,9 @@ class Lexer:
                 self.current_position += len(lexeme)
                 return token
 
-        # If no token matches, raise an error
-        raise ValueError(f"Unexpected character at position {self.current_position}")
+        # If no token matches, print a warning and move forward
+        print(f"Warning: Unexpected character '{self.input_text[self.current_position]}' at position {self.current_position}")
+        self.current_position += 1  # Move forward to continue lexing
 
     def determine_symbol_type(self, token_class):
         # Map token classes to symbol types based on the requirements
@@ -100,15 +101,17 @@ class Lexer:
         self.symbol_table.display()
 
 # Read input from a file and tokenize
-# Read input file
-with open('input.txt', 'r') as file:
-    input_text = file.read()
+def main():
+    # Read input file
+    with open('input.txt', 'r') as file:
+        input_text = file.read()
 
-# Initialize lexer and tokenize the input
-lexer = Lexer(input_text)
-lexer.tokenize()
+    # Initialize lexer and tokenize the input
+    lexer = Lexer(input_text)
+    lexer.tokenize()
 
-# Display the symbol table
-lexer.display_symbol_table()
+    # Display the symbol table
+    lexer.display_symbol_table()
 
-print("Hello World")
+if __name__ == "__main__":
+    main()
