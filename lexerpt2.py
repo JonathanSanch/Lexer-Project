@@ -2,16 +2,18 @@ import re
 
 # Define the Token class with the required attributes.
 class Token:
-    def __init__(self, lexeme, token_class, symbol_type, data_type=None, value=None, scope="Global"):
+    def __init__(self, lexeme, token_class, symbol_type, data_type=None, value=None):
         self.lexeme = lexeme
         self.token_class = token_class
         self.symbol_type = symbol_type
         self.data_type = data_type
         self.value = value
-        self.scope = scope
 
     def __str__(self):
-        return f"{self.lexeme}\t{self.token_class}\t{self.symbol_type}\t{self.data_type}\t{self.value}\t{self.scope}"
+        # Convert None fields to empty strings for display
+        data_type = self.data_type if self.data_type is not None else ""
+        value = self.value if self.value is not None else ""
+        return f"{self.lexeme}\t{self.token_class}\t{self.symbol_type}\t{data_type}\t{value}"
 
 # Define the SymbolTable class to manage tokens.
 class SymbolTable:
@@ -25,10 +27,22 @@ class SymbolTable:
         return self.table.get(lexeme, None)
 
     def display(self):
-        print("Lexeme\tToken Class\tSymbol Type\tData Type\tValue\tScope")
-        print("-------------------------------------------------------------")
+        # Define column headers with fixed widths
+        headers = ["Lexeme", "Token Class", "SymbolType", "DataType", "Value"]
+        widths = [15, 15, 15, 10, 10]  # Set column widths
+
+        # Print header with column widths
+        header_row = "".join(f"{header:<{width}}" for header, width in zip(headers, widths))
+        print(header_row)
+        print("-" * sum(widths))  # Print a line separator
+
+        # Print each token row with aligned columns
         for token in self.table.values():
-            print(token)
+            # Use empty strings for None fields
+            data_type = token.data_type if token.data_type is not None else ""
+            value = token.value if token.value is not None else ""
+            row = f"{token.lexeme:<15}{token.token_class:<15}{token.symbol_type:<15}{data_type:<10}{value:<10}"
+            print(row)
 
 # Define the Lexer class to process input text and generate tokens.
 class Lexer:
@@ -36,6 +50,7 @@ class Lexer:
         self.input_text = input_text
         self.symbol_table = SymbolTable()
         self.current_position = 0
+        self.last_data_type = None  # Track the most recent data type for declarations
 
         # Regular expressions for various token types based on Clite Grammar
         self.token_patterns = {
@@ -68,20 +83,61 @@ class Lexer:
             match = regex.match(self.input_text, self.current_position)
             if match:
                 lexeme = match.group(0)
+                
+                # Assign custom token classes based on lexeme and type
+                token_class = self.assign_custom_token_class(token_class, lexeme)
+                
+                data_type, value = self.determine_data_type_and_value(token_class, lexeme)
                 symbol_type = self.determine_symbol_type(token_class)
-                token = Token(lexeme, token_class, symbol_type)
+                token = Token(lexeme, token_class, symbol_type, data_type=data_type, value=value)
                 self.symbol_table.add_token(token)
                 self.current_position += len(lexeme)
+
+                # Update last_data_type if lexeme is a declaration keyword
+                if token_class == "Keyword" and lexeme in ["int", "bool", "float", "char"]:
+                    self.last_data_type = lexeme
+                elif token_class == "Identifier" and self.last_data_type:
+                    # Assign last_data_type to identifiers declared right after a type keyword
+                    token.data_type = self.last_data_type
+                    self.last_data_type = None  # Reset after assignment
+
                 return token
 
         # If no token matches, print a warning and move forward
         print(f"Warning: Unexpected character '{self.input_text[self.current_position]}' at position {self.current_position}")
         self.current_position += 1  # Move forward to continue lexing
 
+    def assign_custom_token_class(self, token_class, lexeme):
+        # Update the token class based on specific lexeme requirements
+        if token_class == "Keyword":
+            if lexeme == "while":
+                return "TokWhile"
+            elif lexeme in ["if", "else"]:
+                return "TokIf"
+            # Keep `Keyword` as is for other keywords like "int", "float", etc.
+        elif token_class in ["Integer", "Char", "Boolean"]:
+            return "TokLiteral"  # Assign TokLiteral to Integer, Char, and Boolean
+        return token_class
+
+    def determine_data_type_and_value(self, token_class, lexeme):
+        # Determine the data type and value based on the token class and lexeme
+        if token_class == "TokLiteral":
+            if re.fullmatch(r'\b\d+\b', lexeme):  # Integer literal
+                return "int", int(lexeme)
+            elif re.fullmatch(r'\b\d+\.\d+\b', lexeme):  # Float literal
+                return "float", float(lexeme)
+            elif lexeme == "true" or lexeme == "false":  # Boolean literal
+                return "bool", True if lexeme == "true" else False
+            elif len(lexeme) == 3 and lexeme[0] == "'" and lexeme[2] == "'":  # Char literal (e.g., 'A')
+                return "char", lexeme[1]
+        elif token_class == "Identifier" and self.last_data_type:
+            return self.last_data_type, None  # No initial value for identifier declarations
+        return None, None  # Default for other tokens
+
     def determine_symbol_type(self, token_class):
         # Map token classes to symbol types based on the requirements
-        if token_class in ["Keyword", "Identifier", "Char", "Integer", "Float", "Boolean"]:
-            return token_class
+        if token_class in ["Keyword", "Identifier", "TokLiteral"]:
+            return "Variable" if token_class == "Identifier" else "Literal"
         elif token_class in ["RelOp", "EquOp", "AddOp", "MulOp", "UnaryOp", "Assignment"]:
             return "Operator"
         elif token_class == "Delimiter":
